@@ -1,780 +1,1035 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PRED/MKT — Prediction Markets Terminal</title>
-  <style>
-    :root {
-      --black:#000000; --bg1:#030305; --bg2:#07070c; --panel:#0a0a12; --border:#1a1a2e;
-      --border2:#222238; --blue:#003399; --blue2:#0044cc; --blue3:#1a3a8a;
-      --amber:#FFB100; --amber2:#FF8C00; --green:#00FF41; --green2:#00CC33;
-      --red:#FF2233; --red2:#CC0011; --white:#E8E8F0; --gray:#555570;
-      --gray2:#333350; --cyan:#00CCFF; --gold:#FFD700;
-      --mono:'Consolas','Monaco','Courier New',monospace;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    html{font-size:13px;}
-    body{background:var(--black);color:var(--amber);font-family:var(--mono);min-height:100vh;overflow-x:hidden;}
-    body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
-      background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);}
-    button{font-family:var(--mono);cursor:pointer;border:none;outline:none;}
-    input{font-family:var(--mono);outline:none;}
-    ::-webkit-scrollbar{width:4px;height:4px;}
-    ::-webkit-scrollbar-track{background:#000;}
-    ::-webkit-scrollbar-thumb{background:var(--blue3);}
-    input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>COMMOD/TERM — Institutional Commodity Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#000000;
+  --s1:#0a0a0a;
+  --s2:#121212;
+  --s3:#1a1a1a;
+  --border:#333333;
+  --border2:#222222;
+  --orange:#FF9900;
+  --orange2:#CC7700;
+  --orange-dim:rgba(255,153,0,.12);
+  --white:#F0F0F0;
+  --gray:#888888;
+  --gray2:#555555;
+  --gray3:#333333;
+  --green:#00CC44;
+  --green-bright:#00FF41;
+  --red:#FF3333;
+  --red-dim:rgba(255,51,51,.15);
+  --green-dim:rgba(0,204,68,.15);
+  --gold:#D4AF37;
+  --gold-dim:rgba(212,175,55,.15);
+  --amber:#FF7E00;
+  --amber-dim:rgba(255,126,0,.15);
+  --harvest:#4F7942;
+  --harvest-dim:rgba(79,121,66,.15);
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Barlow Condensed',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:12px;-webkit-font-smoothing:antialiased;}
+body{background:var(--black);color:var(--white);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+button{font-family:var(--sans);cursor:pointer;border:none;outline:none;background:none;}
+input{font-family:var(--mono);outline:none;background:none;}
+select{font-family:var(--sans);outline:none;background:var(--s2);color:var(--white);border:1px solid var(--border);cursor:pointer;}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:#000;}
+::-webkit-scrollbar-thumb{background:#333;}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
 
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-    @keyframes slideIn{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
-    @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-    @keyframes glow{0%,100%{box-shadow:0 0 6px currentColor}50%{box-shadow:0 0 20px currentColor}}
+@keyframes blink{0%,100%{opacity:1}49%{opacity:1}50%{opacity:0}99%{opacity:0}}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes priceUp{0%{color:var(--green-bright)}100%{color:inherit}}
+@keyframes priceDn{0%{color:var(--red)}100%{color:inherit}}
 
-    .blink{animation:blink 1s step-end infinite;}
-    .pulse{animation:pulse 1.5s ease-in-out infinite;}
+.fade-in{animation:fadeIn .2s ease-out forwards;}
+.blink{animation:blink 1s step-end infinite;}
+.cursor::after{content:'█';animation:blink .8s step-end infinite;color:var(--orange);font-size:.9em;}
 
-    #root{display:flex;flex-direction:column;min-height:100vh;}
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
 
-    .cmd-bar{background:var(--blue);color:#fff;padding:4px 14px;display:flex;
-      justify-content:space-between;align-items:center;font-size:12px;letter-spacing:.8px;
-      border-bottom:1px solid #0055cc;flex-shrink:0;}
-    .cmd-logo{font-size:14px;font-weight:bold;letter-spacing:2px;}
-    .cmd-logo span{color:var(--amber);}
+/* ── TICKER RIBBON ── */
+.ribbon{background:#000;border-bottom:1px solid var(--border);height:24px;overflow:hidden;flex-shrink:0;}
+.ribbon-inner{display:inline-flex;gap:0;white-space:nowrap;animation:ticker 90s linear infinite;height:100%;align-items:center;}
+.rib-item{display:inline-flex;align-items:center;gap:6px;padding:0 20px;border-right:1px solid var(--border2);height:100%;font-size:11px;}
+.rib-sym{color:var(--gray);font-weight:500;letter-spacing:.5px;font-family:var(--sans);}
+.rib-price{font-family:var(--mono);font-size:11px;}
+.rib-chg{font-family:var(--mono);font-size:10px;}
+.up{color:var(--green);}
+.dn{color:var(--red);}
+.unch{color:var(--gray);}
 
-    .sub-bar{background:#000820;color:#6a8dd8;padding:2px 14px;display:flex;gap:18px;
-      font-size:11px;border-bottom:1px solid #001155;overflow:hidden;flex-shrink:0;align-items:center;}
+/* ── COMMAND HEADER ── */
+.cmd-header{background:var(--black);border-bottom:1px solid var(--border);display:flex;align-items:stretch;flex-shrink:0;height:36px;}
+.cmd-logo{display:flex;align-items:center;gap:8px;padding:0 16px;border-right:1px solid var(--border);flex-shrink:0;}
+.cmd-logo-text{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:2px;color:var(--orange);}
+.cmd-logo-sub{font-size:10px;color:var(--gray2);letter-spacing:1px;margin-top:1px;}
+.cmd-tabs{display:flex;align-items:stretch;flex:1;}
+.cmd-tab{display:flex;align-items:center;gap:6px;padding:0 18px;font-size:12px;font-weight:600;letter-spacing:1px;color:var(--gray);border-right:1px solid var(--border2);cursor:pointer;transition:all .15s;position:relative;font-family:var(--sans);}
+.cmd-tab:hover{background:var(--s1);color:var(--white);}
+.cmd-tab.active{color:var(--orange);background:var(--s1);}
+.cmd-tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--orange);}
+.cmd-tab .kbshort{font-size:9px;color:var(--gray2);background:var(--s3);padding:1px 4px;border:1px solid var(--border);}
+.cmd-tab.active .kbshort{color:var(--orange2);}
+.cmd-right{display:flex;align-items:center;gap:0;margin-left:auto;}
+.wallet-btn{display:flex;align-items:center;gap:6px;padding:0 14px;font-size:11px;font-weight:500;color:var(--gray);border-left:1px solid var(--border);cursor:pointer;height:100%;transition:all .15s;letter-spacing:.5px;font-family:var(--sans);}
+.wallet-btn:hover{background:var(--s1);color:var(--white);}
+.wallet-btn.conn{color:var(--green);}
+.wallet-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
 
-    .ticker-wrap{background:#000510;border-bottom:1px solid #001133;overflow:hidden;height:22px;flex-shrink:0;}
-    .ticker-inner{display:inline-flex;gap:40px;white-space:nowrap;animation:ticker 80s linear infinite;padding:3px 0;font-size:11px;}
-    .tick-up{color:var(--green);}
-    .tick-dn{color:var(--red);}
-    .tick-sym{color:var(--white);}
+/* ── BREADCRUMB ── */
+.breadcrumb{background:var(--s1);border-bottom:1px solid var(--border2);padding:4px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.bc-path{font-size:10px;color:var(--gray2);letter-spacing:.8px;font-family:var(--sans);}
+.bc-path span{color:var(--orange);}
+.bc-right{display:flex;align-items:center;gap:10px;font-size:10px;color:var(--gray2);}
+.bc-toggle{display:flex;gap:1px;}
+.bc-tog-btn{padding:2px 8px;font-size:10px;letter-spacing:.5px;font-family:var(--sans);font-weight:500;color:var(--gray);border:1px solid var(--border2);background:none;transition:all .12s;cursor:pointer;}
+.bc-tog-btn.active{background:var(--orange);color:#000;border-color:var(--orange);}
 
-    .main-wrap{display:flex;flex:1;gap:2px;padding:2px;background:#000;overflow:hidden;min-height:0;}
+/* ── MAIN ── */
+.main{display:flex;flex:1;overflow:hidden;gap:0;}
 
-    .sidebar{width:255px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;overflow:hidden;}
-    .center-col{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;overflow-y:auto;}
-    .trade-col{width:275px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+/* ── LEFT SIDEBAR — Market Monitor ── */
+.sidebar{width:196px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sb-head{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.sb-title{font-size:10px;font-weight:600;letter-spacing:1.5px;color:var(--orange);font-family:var(--sans);}
+.sb-count{font-size:10px;color:var(--gray2);font-family:var(--mono);}
+.sb-list{overflow-y:auto;flex:1;}
+.sb-cat{padding:4px 10px 2px;font-size:9px;font-weight:600;letter-spacing:2px;color:var(--gray2);font-family:var(--sans);display:flex;align-items:center;gap:6px;}
+.sb-cat::before{content:'';width:8px;height:2px;flex-shrink:0;}
+.sb-cat.cat-metals::before{background:var(--gold);}
+.sb-cat.cat-energy::before{background:var(--amber);}
+.sb-cat.cat-agri::before{background:var(--harvest);}
+.sb-row{padding:5px 10px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .1s;display:grid;grid-template-columns:1fr auto;gap:2px 6px;align-items:center;position:relative;}
+.sb-row:hover{background:var(--s1);}
+.sb-row.active{background:var(--s2);}
+.sb-row.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--orange);}
+.sb-row-cat{border-top:2px solid transparent;}
+.sb-row-cat.cat-metals{border-top-color:var(--gold);}
+.sb-row-cat.cat-energy{border-top-color:var(--amber);}
+.sb-row-cat.cat-agri{border-top-color:var(--harvest);}
+.sb-sym{font-size:11px;font-weight:600;color:var(--white);font-family:var(--sans);letter-spacing:.3px;}
+.sb-price{font-size:11px;font-family:var(--mono);text-align:right;}
+.sb-name{font-size:9px;color:var(--gray2);font-family:var(--sans);}
+.sb-timer{font-size:9px;font-family:var(--mono);}
+.sb-phase{font-size:8px;padding:1px 4px;border:1px solid;font-family:var(--sans);font-weight:600;letter-spacing:.5px;}
+.ph-open{color:var(--green);border-color:var(--green);}
+.ph-lock{color:var(--amber);border-color:var(--amber);}
+.ph-res{color:var(--red);border-color:var(--red);}
 
-    .panel{background:var(--panel);border:1px solid var(--border);}
-    .ph{background:var(--blue);color:#fff;padding:3px 10px;font-size:11px;letter-spacing:1px;
-      display:flex;justify-content:space-between;align-items:center;}
-    .ph.ah{background:#3d2800;color:var(--amber);border-bottom:1px solid var(--amber2);}
-    .ph.gh{background:#00260d;color:var(--green);border-bottom:1px solid var(--green2);}
-    .pb{padding:8px 10px;}
+/* ── CENTER — Grid + Deep Dive ── */
+.center{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
 
-    /* Market list */
-    .mcard{padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;position:relative;}
-    .mcard:hover{background:#0d0d1a;}
-    .mcard.act{background:#060616;border-left:2px solid var(--amber);}
-    .mcard.act::after{content:'▶';position:absolute;right:7px;top:50%;transform:translateY(-50%);color:var(--amber);font-size:9px;}
-    .mc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
-    .mc-sym{color:var(--white);font-size:12px;}
-    .mc-price{font-size:12px;}
-    .up{color:var(--green);}
-    .dn{color:var(--red);}
-    .mc-bot{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;}
-    .mc-name{color:var(--gray);}
-    .badge{font-size:9px;padding:1px 5px;border:1px solid;}
-    .badge.o{color:#00CC33;border-color:#00CC33;}
-    .badge.l{color:var(--amber);border-color:var(--amber);}
-    .badge.r{color:var(--red);border-color:var(--red);}
-    .pool-mini{display:flex;justify-content:space-between;font-size:9px;color:#445;margin-top:2px;}
+/* Grid view */
+.grid-view{flex:1;overflow-y:auto;padding:8px;}
+.grid-section{margin-bottom:12px;}
+.grid-section-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:0 2px;}
+.grid-section-label{font-size:10px;font-weight:700;letter-spacing:2px;font-family:var(--sans);}
+.grid-section-line{flex:1;height:1px;background:var(--border2);}
+.grid-row{display:grid;gap:6px;}
+.grid-row.cols-3{grid-template-columns:repeat(3,1fr);}
+.grid-row.cols-4{grid-template-columns:repeat(4,1fr);}
 
-    /* Price hero */
-    .price-hero{padding:12px 16px;background:var(--panel);border:1px solid var(--border);}
-    .ph-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
-    .ph-sym{font-size:11px;color:var(--gray);margin-bottom:2px;letter-spacing:2px;}
-    .ph-price{font-size:36px;letter-spacing:3px;line-height:1;}
-    .ph-delta{font-size:18px;padding-bottom:4px;}
-    .ph-right{margin-left:auto;text-align:right;}
-    .ph-time{font-size:30px;letter-spacing:2px;}
-    .ph-phase{font-size:11px;margin-top:2px;}
-    .prog{height:3px;background:#111;margin-top:10px;}
-    .prog-fill{height:100%;transition:width .9s linear;}
+/* Market card */
+.mkt-card{background:var(--s1);border:1px solid var(--border2);display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden;}
+.mkt-card:hover{border-color:var(--border);}
+.mkt-card.active{border-color:var(--orange);}
+.mkt-card.active::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--orange);}
+.mkt-card-top{border-top:2px solid transparent;}
+.mkt-card-top.cat-metals{border-top-color:var(--gold);}
+.mkt-card-top.cat-energy{border-top-color:var(--amber);}
+.mkt-card-top.cat-agri{border-top-color:var(--harvest);}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 9px 4px;}
+.card-sym{font-size:13px;font-weight:700;color:var(--white);letter-spacing:.5px;font-family:var(--sans);}
+.card-name{font-size:9px;color:var(--gray2);font-family:var(--sans);margin-top:1px;}
+.card-price-block{text-align:right;}
+.card-price{font-size:14px;font-family:var(--mono);font-weight:500;line-height:1;}
+.card-chg{font-size:10px;font-family:var(--mono);margin-top:1px;}
+.card-chart{padding:0 6px;height:44px;}
+.card-footer{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-top:1px solid var(--border2);}
+.card-timer{font-size:11px;font-family:var(--mono);}
+.card-sentiment{display:flex;flex-direction:column;gap:2px;flex:1;margin:0 8px;}
+.sentiment-bar{height:4px;background:var(--red-dim);border:1px solid var(--border2);position:relative;overflow:hidden;}
+.sentiment-long{height:100%;background:var(--green);transition:width .5s ease;}
+.sentiment-labels{display:flex;justify-content:space-between;font-size:8px;font-family:var(--mono);}
+.card-actions{display:flex;gap:3px;}
+.card-btn{padding:3px 8px;font-size:10px;font-weight:700;letter-spacing:.5px;font-family:var(--sans);border:1px solid;transition:all .12s;}
+.btn-buy{color:var(--green);border-color:var(--green);background:var(--green-dim);}
+.btn-buy:hover{background:var(--green);color:#000;}
+.btn-sell{color:var(--red);border-color:var(--red);background:var(--red-dim);}
+.btn-sell:hover{background:var(--red);color:#000;}
+.btn-buy:disabled,.btn-sell:disabled{opacity:.3;cursor:not-allowed;}
 
-    /* Stats */
-    .sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:8px;}
-    .sbox{background:#060610;border:1px solid var(--border);padding:5px 8px;}
-    .slbl{font-size:9px;color:var(--gray);letter-spacing:1px;margin-bottom:2px;}
-    .sval{font-size:13px;color:var(--amber);}
+/* ── DEEP DIVE VIEW ── */
+.deep-view{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.deep-header{padding:6px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.deep-back{font-size:10px;color:var(--gray2);cursor:pointer;display:flex;align-items:center;gap:4px;font-family:var(--sans);font-weight:600;letter-spacing:.5px;transition:color .12s;}
+.deep-back:hover{color:var(--orange);}
+.deep-asset{font-size:15px;font-weight:700;color:var(--white);font-family:var(--sans);letter-spacing:.5px;}
+.deep-price{font-size:22px;font-family:var(--mono);font-weight:500;}
+.deep-chg{font-size:12px;font-family:var(--mono);}
+.deep-phase{font-size:10px;padding:2px 8px;border:1px solid;font-family:var(--sans);font-weight:600;letter-spacing:.5px;}
+.deep-body{flex:1;display:flex;overflow:hidden;min-height:0;}
+.deep-center{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;padding:8px;}
+.deep-right{width:260px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
 
-    /* Pool */
-    .psec{padding:0 8px 8px;}
-    .plbl{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;}
-    .pbar{height:6px;background:var(--red);}
-    .plong{height:100%;background:var(--green);transition:width .6s ease;}
+/* Filmstrip */
+.filmstrip{display:flex;gap:3px;padding:0 0 6px;flex-shrink:0;}
+.film-box{flex:1;min-width:28px;height:24px;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--mono);font-weight:600;border:1px solid;}
+.film-long{background:var(--green-dim);border-color:var(--green);color:var(--green);}
+.film-short{background:var(--red-dim);border-color:var(--red);color:var(--red);}
+.film-none{background:var(--s2);border-color:var(--border2);color:var(--gray2);}
+.film-label{font-size:8px;color:var(--gray2);font-family:var(--sans);letter-spacing:.5px;margin-bottom:3px;}
 
-    /* Last result */
-    .rgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:8px;}
-    .rbox .rl{font-size:9px;color:var(--gray);}
-    .rbox .rv{font-size:12px;}
+/* Chart */
+.chart-wrap{flex:1;position:relative;min-height:0;}
+.chart-label{font-size:9px;color:var(--gray2);font-family:var(--sans);letter-spacing:.5px;margin-bottom:4px;}
 
-    /* Trade */
-    .tsec{padding:10px;}
-    .tlbl{font-size:10px;color:var(--gray);letter-spacing:1px;margin-bottom:5px;}
-    .sinput{width:100%;background:#030310;border:1px solid var(--amber);color:var(--amber);
-      font-size:18px;padding:6px 10px;margin-bottom:8px;font-family:var(--mono);}
-    .sinput:focus{border-color:var(--gold);box-shadow:0 0 8px rgba(255,177,0,.3);}
-    .qbets{display:flex;gap:4px;margin-bottom:10px;}
-    .qb{flex:1;padding:4px 0;background:#0a0a14;color:var(--amber);border:1px solid var(--border2);font-size:11px;transition:all .12s;}
-    .qb:hover{background:#15152a;border-color:var(--amber);}
-    .qb.aq{background:var(--amber);color:#000;border-color:var(--amber);}
-    .btn-lo{width:100%;padding:14px;font-size:16px;letter-spacing:3px;margin-bottom:6px;
-      background:#001f00;color:var(--green);border:2px solid var(--green);transition:all .15s;}
-    .btn-lo:hover:not(:disabled){background:#003300;box-shadow:0 0 18px rgba(0,255,65,.4);}
-    .btn-lo:disabled{background:#0a0a0a;color:#333;border-color:#333;cursor:not-allowed;}
-    .btn-sh{width:100%;padding:14px;font-size:16px;letter-spacing:3px;
-      background:#1f0000;color:var(--red);border:2px solid var(--red);transition:all .15s;}
-    .btn-sh:hover:not(:disabled){background:#330000;box-shadow:0 0 18px rgba(255,34,51,.4);}
-    .btn-sh:disabled{background:#0a0a0a;color:#333;border-color:#333;cursor:not-allowed;}
-    .bmsg{margin-top:8px;padding:6px 10px;font-size:11px;border:1px solid;}
+/* Order entry */
+.order-section{padding:10px 12px;border-bottom:1px solid var(--border2);}
+.order-title{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--orange);font-family:var(--sans);margin-bottom:8px;}
+.order-label{font-size:9px;color:var(--gray);font-family:var(--sans);letter-spacing:.5px;margin-bottom:4px;}
+.order-input{width:100%;background:var(--s2);border:1px solid var(--border);color:var(--white);font-size:16px;padding:7px 10px;font-family:var(--mono);transition:border-color .15s;}
+.order-input:focus{border-color:var(--orange);}
+.order-input.cursor-active::after{content:'█';}
+.quick-row{display:flex;gap:3px;margin:6px 0;}
+.quick-btn{flex:1;padding:4px 0;font-size:10px;font-weight:600;font-family:var(--sans);color:var(--gray);background:var(--s2);border:1px solid var(--border2);transition:all .12s;cursor:pointer;}
+.quick-btn:hover{border-color:var(--orange);color:var(--orange);}
+.quick-btn.aq{background:var(--orange-dim);border-color:var(--orange);color:var(--orange);}
+.exec-row{display:flex;gap:4px;margin-top:8px;}
+.exec-long{flex:1;padding:10px;font-size:13px;font-weight:700;letter-spacing:1px;font-family:var(--sans);background:var(--green-dim);color:var(--green-bright);border:1px solid var(--green);transition:all .15s;}
+.exec-long:hover:not(:disabled){background:var(--green);color:#000;}
+.exec-long:disabled{opacity:.3;cursor:not-allowed;}
+.exec-short{flex:1;padding:10px;font-size:13px;font-weight:700;letter-spacing:1px;font-family:var(--sans);background:var(--red-dim);color:var(--red);border:1px solid var(--red);transition:all .15s;}
+.exec-short:hover:not(:disabled){background:var(--red);color:#000;}
+.exec-short:disabled{opacity:.3;cursor:not-allowed;}
+.payout-box{margin-top:8px;padding:6px 8px;background:var(--s2);border:1px solid var(--border2);}
+.payout-row{display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;}
+.payout-lbl{color:var(--gray);font-family:var(--sans);}
+.payout-val{font-family:var(--mono);color:var(--white);}
+.payout-val.positive{color:var(--green);}
+.payout-val.orange{color:var(--orange);}
+.exec-msg{margin-top:6px;padding:5px 8px;font-size:10px;font-family:var(--sans);border:1px solid;}
 
-    /* Wallet */
-    .wsec{padding:10px;}
-    .btn-wl{width:100%;padding:10px;font-size:12px;letter-spacing:1px;
-      background:#001040;color:var(--cyan);border:1px solid var(--cyan);transition:all .15s;}
-    .btn-wl:hover{background:#002060;box-shadow:0 0 12px rgba(0,204,255,.3);}
-    .btn-wl.conn{background:#002a10;color:var(--green);border-color:var(--green);}
-    .wrow{display:flex;justify-content:space-between;font-size:11px;margin-top:4px;}
-    .wl{color:var(--gray);}
-    .wv{color:var(--white);}
+/* Stats in deep view */
+.stats-section{padding:10px 12px;border-bottom:1px solid var(--border2);}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.stat-cell{background:var(--s2);padding:5px 7px;}
+.stat-lbl{font-size:8px;color:var(--gray2);font-family:var(--sans);letter-spacing:.8px;margin-bottom:2px;}
+.stat-val{font-size:12px;font-family:var(--mono);}
 
-    /* Claim */
-    .csec{padding:10px;}
-    .btn-cl{width:100%;padding:9px;font-size:12px;letter-spacing:1px;margin-top:5px;
-      background:#3a2a00;color:var(--gold);border:1px solid var(--gold);transition:all .15s;}
-    .btn-cl:hover:not(:disabled){background:#5a4000;box-shadow:0 0 14px rgba(255,215,0,.4);}
-    .btn-cl:disabled{background:#1a1a1a;color:#555;border-color:#333;cursor:not-allowed;}
-    .crow{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;}
-    .cl2{color:var(--gray);}
-    .cv2{color:var(--gold);}
+/* Round meter */
+.round-meter{padding:8px 12px;border-bottom:1px solid var(--border2);}
+.meter-label{display:flex;justify-content:space-between;font-size:9px;margin-bottom:4px;font-family:var(--sans);}
+.meter-bar{height:3px;background:var(--border2);}
+.meter-fill{height:100%;transition:width .9s linear;}
+.tug-section{margin-top:8px;}
+.tug-labels{display:flex;justify-content:space-between;font-size:9px;font-family:var(--mono);margin-bottom:3px;}
+.tug-bar{height:8px;background:var(--red-dim);border:1px solid var(--border2);position:relative;}
+.tug-long{height:100%;background:var(--green);transition:width .5s ease;}
 
-    /* Log */
-    .log-wrap{height:130px;overflow-y:auto;padding:6px 10px;font-size:11px;line-height:1.75;}
-    .lline{display:flex;gap:6px;}
-    .lts{color:#334;flex-shrink:0;}
-    .lmsg{color:var(--green2);}
-    .lwarn{color:var(--amber);}
-    .lerr{color:var(--red);}
-    .lsys{color:var(--cyan);}
+/* ── BOTTOM TABS ── */
+.bottom{height:180px;flex-shrink:0;border-top:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.bottom-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.bot-tab{padding:5px 14px;font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--gray);font-family:var(--sans);cursor:pointer;border-right:1px solid var(--border2);transition:all .12s;position:relative;}
+.bot-tab:hover{color:var(--white);}
+.bot-tab.active{color:var(--orange);}
+.bot-tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--orange);}
+.bot-tab .count{font-size:9px;background:var(--orange);color:#000;padding:0 4px;margin-left:4px;font-family:var(--mono);}
+.bottom-content{flex:1;overflow-y:auto;}
 
-    .status-bar{background:#000508;border-top:1px solid #001133;padding:2px 12px;
-      display:flex;justify-content:space-between;font-size:10px;color:#444;flex-shrink:0;}
-    .sok{color:var(--green2);}
-    .swarn{color:var(--amber);}
+/* Position rows */
+.pos-table{width:100%;border-collapse:collapse;}
+.pos-table th{font-size:9px;font-weight:600;letter-spacing:.8px;color:var(--gray2);font-family:var(--sans);padding:4px 10px;border-bottom:1px solid var(--border2);text-align:left;background:var(--s1);white-space:nowrap;}
+.pos-table td{font-size:10px;padding:5px 10px;border-bottom:1px solid var(--border2);font-family:var(--mono);white-space:nowrap;vertical-align:middle;}
+.pos-table tr:hover td{background:var(--s1);}
+.pos-side-long{color:var(--green);font-weight:600;}
+.pos-side-short{color:var(--red);font-weight:600;}
+.pos-status{font-size:9px;padding:1px 5px;border:1px solid;font-family:var(--sans);font-weight:600;}
+.pos-open{color:var(--orange);border-color:var(--orange);}
+.pos-win{color:var(--green);border-color:var(--green);}
+.pos-loss{color:var(--red);border-color:var(--red);}
+.claim-btn{padding:2px 8px;font-size:9px;font-weight:600;font-family:var(--sans);background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold);cursor:pointer;transition:all .12s;letter-spacing:.5px;}
+.claim-btn:hover{background:var(--gold);color:#000;}
+.empty-state{padding:20px;text-align:center;font-size:11px;color:var(--gray2);font-family:var(--sans);letter-spacing:.5px;}
 
-    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;
-      align-items:center;justify-content:center;z-index:1000;}
-    .modal{background:var(--panel);border:1px solid var(--blue2);padding:24px;min-width:320px;
-      max-width:420px;box-shadow:0 0 40px rgba(0,68,204,.5);animation:slideIn .2s ease-out;}
-    .modal-title{color:#fff;font-size:14px;letter-spacing:1px;margin-bottom:16px;
-      border-bottom:1px solid var(--border2);padding-bottom:8px;}
-    .modal-body{color:var(--gray);font-size:12px;line-height:1.8;margin-bottom:16px;}
-    .modal-body strong{color:var(--amber);}
-    .modal-close{background:#111;color:var(--amber);border:1px solid var(--amber);padding:6px 20px;font-size:12px;float:right;}
-    .modal-close:hover{background:#221a00;}
+/* ── RIGHT PANEL — Wallet / global ── */
+.right-rail{width:0;flex-shrink:0;border-left:1px solid var(--border);overflow:hidden;transition:width .2s ease;display:flex;flex-direction:column;}
+.right-rail.open{width:220px;}
 
-    canvas{display:block;}
+/* ── STATUS BAR ── */
+.statusbar{background:var(--black);border-top:1px solid var(--border2);padding:2px 12px;display:flex;justify-content:space-between;font-size:9px;color:var(--gray2);font-family:var(--sans);letter-spacing:.5px;flex-shrink:0;}
+.sb-ok{color:var(--green);}
+.sb-warn{color:var(--amber);}
 
-    @media(max-width:1100px){.sidebar{width:210px;}.trade-col{width:240px;}}
-    @media(max-width:800px){.main-wrap{flex-direction:column;}.sidebar,.trade-col{width:100%;}}
-  </style>
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:9000;}
+.modal-box{background:var(--s2);border:1px solid var(--border);padding:24px;min-width:300px;max-width:380px;animation:fadeIn .15s ease-out;}
+.modal-title{font-size:13px;font-weight:700;color:var(--orange);font-family:var(--sans);letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border2);}
+.modal-body{font-size:11px;color:var(--gray);font-family:var(--sans);line-height:1.7;margin-bottom:16px;}
+.modal-body strong{color:var(--white);}
+.modal-close{padding:6px 16px;font-size:11px;font-weight:600;letter-spacing:.5px;font-family:var(--sans);background:none;color:var(--orange);border:1px solid var(--orange);cursor:pointer;float:right;transition:all .12s;}
+.modal-close:hover{background:var(--orange);color:#000;}
+
+canvas{display:block;}
+</style>
 </head>
 <body>
-<div id="root"></div>
+<div id="app"></div>
 
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 
 <script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
 
-/* ─── Markets ─────────────────────────────────────────────────────────────── */
-const MKTS_DEF = [
-  {id:"XCU", sym:"XCU/USD", name:"Copper",       base:4.1200,  vol:0.003,  icon:"🟤", cat:"METALS" },
-  {id:"XAU", sym:"XAU/USD", name:"Gold",          base:2345.0,  vol:0.5,    icon:"🟡", cat:"METALS" },
-  {id:"XAG", sym:"XAG/USD", name:"Silver",        base:28.42,   vol:0.09,   icon:"⚪", cat:"METALS" },
-  {id:"BTC", sym:"BTC/USD", name:"Bitcoin",       base:67800,   vol:130,    icon:"🟠", cat:"CRYPTO" },
-  {id:"ETH", sym:"ETH/USD", name:"Ethereum",      base:3540,    vol:9,      icon:"🔷", cat:"CRYPTO" },
-  {id:"SOL", sym:"SOL/USD", name:"Solana",        base:168.4,   vol:1.2,    icon:"🟣", cat:"CRYPTO" },
-  {id:"BNB", sym:"BNB/USD", name:"BNB",           base:585,     vol:2.2,    icon:"🟡", cat:"CRYPTO" },
-  {id:"CL",  sym:"CL/USD",  name:"Crude Oil",     base:78.45,   vol:0.16,   icon:"🛢", cat:"ENERGY" },
-  {id:"NG",  sym:"NG/USD",  name:"Nat. Gas",      base:2.31,    vol:0.012,  icon:"🔥", cat:"ENERGY" },
-  {id:"EUR", sym:"EUR/USD", name:"Euro",          base:1.0845,  vol:0.0006, icon:"🇪🇺", cat:"FOREX" },
-  {id:"GBP", sym:"GBP/USD", name:"Pound",         base:1.2730,  vol:0.0007, icon:"🇬🇧", cat:"FOREX" },
-  {id:"SPX", sym:"SPX/USD", name:"S&P 500",       base:5420,    vol:10,     icon:"📈", cat:"INDEX" },
+/* ─── ASSET DEFINITIONS ──────────────────────────────────────────────────── */
+const ASSETS=[
+  // METALS
+  {id:"XAU",sym:"XAU/USD",name:"Gold Spot",      base:2345.20,vol:0.55, cat:"METALS", unit:"t oz"},
+  {id:"XAG",sym:"XAG/USD",name:"Silver Spot",     base:28.430, vol:0.09, cat:"METALS", unit:"t oz"},
+  {id:"XCU",sym:"XCU/USD",name:"Copper",          base:4.1240, vol:0.004,cat:"METALS", unit:"lb"},
+  {id:"XPT",sym:"XPT/USD",name:"Platinum",        base:962.0,  vol:1.2,  cat:"METALS", unit:"t oz"},
+  // ENERGY
+  {id:"CL", sym:"WTI/USD", name:"WTI Crude Oil",  base:78.45,  vol:0.16, cat:"ENERGY", unit:"bbl"},
+  {id:"BRN",sym:"BRN/USD", name:"Brent Crude",    base:82.30,  vol:0.18, cat:"ENERGY", unit:"bbl"},
+  {id:"NG", sym:"NG/USD",  name:"Natural Gas",     base:2.315,  vol:0.012,cat:"ENERGY", unit:"MMBtu"},
+  {id:"HO", sym:"HO/USD",  name:"Heating Oil",    base:2.640,  vol:0.008,cat:"ENERGY", unit:"gal"},
+  // AGRI
+  {id:"ZC", sym:"ZC/USD",  name:"Corn",            base:436.50, vol:1.5,  cat:"AGRI",   unit:"bu"},
+  {id:"ZS", sym:"ZS/USD",  name:"Soybeans",        base:1082.0, vol:3.2,  cat:"AGRI",   unit:"bu"},
+  {id:"ZW", sym:"ZW/USD",  name:"Wheat",           base:548.25, vol:2.1,  cat:"AGRI",   unit:"bu"},
+  {id:"CT", sym:"CT/USD",  name:"Cotton",          base:78.60,  vol:0.3,  cat:"AGRI",   unit:"lb"},
 ];
 
-const ROUND = 300, LOCK = 60;
-const CONTRACT = "0x0000000000000000000000000000000000000000"; // ← replace with your contract
+const CAT_COLOR={METALS:"#D4AF37",ENERGY:"#FF7E00",AGRI:"#4F7942"};
+const ROUND=300, LOCK=60;
+const CONTRACT="0x0000000000000000000000000000000000000000";
+const CHAINS={1:"MAINNET",5:"GOERLI",11155111:"SEPOLIA",137:"POLYGON",42161:"ARBITRUM",10:"OPTIMISM",8453:"BASE"};
 
-/* ─── Utils ──────────────────────────────────────────────────────────────── */
-function gauss(){
-  let u=0,v=0;
-  while(!u)u=Math.random();while(!v)v=Math.random();
-  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-}
-function nxt(p,vol){ return Math.max(p*.7,Math.min(p*1.5,p+gauss()*vol)); }
-function r4(n){ return Math.round(n*10000)/10000; }
-function fp(p){ return p>=1000?p.toFixed(2):p>=10?p.toFixed(3):p.toFixed(4); }
-function ft(s){ return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`; }
-function fa(a){ return a?`${a.slice(0,6)}…${a.slice(-4)}`:""; }
-function ts(){ return new Date().toLocaleTimeString("en-US",{hour12:false}); }
+/* ─── UTILS ──────────────────────────────────────────────────────────────── */
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function nxt(p,vol){return Math.max(p*.85,Math.min(p*1.15,p+gauss()*vol));}
+function fp(p,n){if(n!=null)return p.toFixed(n);return p>=1000?p.toFixed(2):p>=10?p.toFixed(3):p.toFixed(4);}
+function ft(s){return`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;}
+function fa(a){return a?`${a.slice(0,6)}…${a.slice(-4)}`:"N/A";}
+function ts(){return new Date().toLocaleTimeString("en-US",{hour12:false});}
+function phaseCls(p){return p==="OPEN"?"ph-open":p==="LOCKED"?"ph-lock":"ph-res";}
+function phaseIco(p){return p==="OPEN"?"●":p==="LOCKED"?"⬡":"■";}
 
-/* ─── Sparkline ──────────────────────────────────────────────────────────── */
-function Spark({data,height=90,mini=false}){
+/* ─── SPARKLINE — crisp 1px vector line, no glow ────────────────────────── */
+function Spark({data,height=44,color=null,mini=false}){
   const ref=useRef(null);
   useEffect(()=>{
-    if(!ref.current||data.length<2) return;
+    if(!ref.current||data.length<2)return;
     const cv=ref.current,ctx=cv.getContext("2d");
-    const W=cv.offsetWidth||700, H=height;
-    cv.width=W; cv.height=H; ctx.clearRect(0,0,W,H);
-    const mn=Math.min(...data)*.999, mx=Math.max(...data)*1.001, rng=mx-mn||1;
-    const xs=i=>(i/(data.length-1))*W;
-    const ys=v=>H-((v-mn)/rng)*(H-4)-2;
+    const W=cv.offsetWidth||300;
+    cv.width=W;cv.height=height;
+    ctx.clearRect(0,0,W,height);
+    const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;
+    const xs=i=>(i/(data.length-1))*(W-2)+1;
+    const ys=v=>height-2-((v-mn)/rng)*(height-4);
     const up=data[data.length-1]>=data[0];
-    if(!mini){
-      ctx.strokeStyle="rgba(255,177,0,.05)"; ctx.lineWidth=1;
-      for(let i=0;i<5;i++){const y=(i/4)*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    }
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,up?"rgba(0,255,65,.18)":"rgba(255,34,51,.18)");
-    g.addColorStop(1,"rgba(0,0,0,0)");
-    ctx.beginPath(); ctx.moveTo(xs(0),H);
-    data.forEach((v,i)=>ctx.lineTo(xs(i),ys(v)));
-    ctx.lineTo(xs(data.length-1),H); ctx.closePath();
-    ctx.fillStyle=g; ctx.fill();
-    ctx.beginPath(); ctx.lineWidth=mini?.9:1.5;
-    ctx.strokeStyle=up?"#00FF41":"#FF2233";
+    const c=color||(up?"#00CC44":"#FF3333");
+    ctx.beginPath();
+    ctx.lineWidth=1;
+    ctx.strokeStyle=c;
     data.forEach((v,i)=>i===0?ctx.moveTo(xs(i),ys(v)):ctx.lineTo(xs(i),ys(v)));
     ctx.stroke();
     if(!mini){
-      ctx.beginPath();
-      ctx.arc(xs(data.length-1),ys(data[data.length-1]),3.5,0,Math.PI*2);
-      ctx.fillStyle=up?"#00FF41":"#FF2233"; ctx.fill();
+      // zero line
+      const zeroY=ys(data[0]);
+      ctx.beginPath();ctx.lineWidth=1;ctx.strokeStyle="rgba(255,255,255,.06)";
+      ctx.setLineDash([2,4]);ctx.moveTo(1,zeroY);ctx.lineTo(W-1,zeroY);ctx.stroke();ctx.setLineDash([]);
     }
-  },[data,height,mini]);
+  },[data,height,color,mini]);
   return <canvas ref={ref} style={{width:"100%",height,display:"block"}}/>;
 }
 
-/* ─── Init ───────────────────────────────────────────────────────────────── */
+/* ─── CANDLESTICK CHART ──────────────────────────────────────────────────── */
+function CandleChart({data,height=160}){
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(!ref.current||data.length<2)return;
+    const cv=ref.current,ctx=cv.getContext("2d");
+    const W=cv.offsetWidth||600;
+    cv.width=W;cv.height=height;
+    ctx.clearRect(0,0,W,height);
+
+    // Build candles from tick data (group every 6 ticks = ~12s candle)
+    const size=Math.max(1,Math.floor(data.length/Math.min(data.length,40)));
+    const candles=[];
+    for(let i=0;i<data.length;i+=size){
+      const slice=data.slice(i,i+size);
+      candles.push({o:slice[0],c:slice[slice.length-1],h:Math.max(...slice),l:Math.min(...slice)});
+    }
+    if(candles.length<2)return;
+
+    const allH=candles.map(c=>c.h),allL=candles.map(c=>c.l);
+    const mn=Math.min(...allL)*.9995,mx=Math.max(...allH)*1.0005,rng=mx-mn||1;
+    const ys=v=>height-4-((v-mn)/rng)*(height-8);
+    const cW=Math.max(3,Math.floor((W-20)/candles.length)-1);
+    const gap=Math.max(1,Math.floor((W-20)/candles.length));
+
+    // Grid
+    ctx.strokeStyle="rgba(255,255,255,.04)";ctx.lineWidth=1;
+    for(let i=0;i<5;i++){const y=(i/4)*(height-8)+4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+    candles.forEach((c,i)=>{
+      const x=10+i*gap;
+      const bull=c.c>=c.o;
+      const col=bull?"#00CC44":"#FF3333";
+      // Wick
+      ctx.strokeStyle=col;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x+cW/2,ys(c.h));ctx.lineTo(x+cW/2,ys(c.l));ctx.stroke();
+      // Body
+      const yO=ys(c.o),yC=ys(c.c);
+      const bodyY=Math.min(yO,yC),bodyH=Math.max(1,Math.abs(yO-yC));
+      ctx.fillStyle=col;
+      ctx.fillRect(x,bodyY,cW,bodyH);
+    });
+  },[data,height]);
+  return <canvas ref={ref} style={{width:"100%",height,display:"block"}}/>;
+}
+
+/* ─── INIT MARKET STATE ──────────────────────────────────────────────────── */
 function initMkts(){
-  return MKTS_DEF.map(m=>({
-    ...m,
-    lp: m.base, sp: m.base, hist: [m.base],
+  return ASSETS.map(a=>({
+    ...a,
+    lp:a.base, sp:a.base, hist:[a.base],
     phase:"OPEN",
-    tl: Math.floor(ROUND-Math.random()*ROUND),
-    rid: 1,
-    pl: +(Math.random()*600).toFixed(2),
-    ps: +(Math.random()*500).toFixed(2),
-    last: null,
+    tl:Math.floor(Math.random()*ROUND),
+    rid:Math.floor(Math.random()*200)+1,
+    pl:+(Math.random()*800).toFixed(2),
+    ps:+(Math.random()*700).toFixed(2),
+    last:null,
+    film:Array.from({length:10},()=>Math.random()>.45?"LONG":"SHORT"),
   }));
 }
 
-/* ─── App ────────────────────────────────────────────────────────────────── */
+/* ─── APP ────────────────────────────────────────────────────────────────── */
 function App(){
-  const [mkts,   setMkts]  = useState(initMkts);
-  const [active, setActive]= useState("XCU");
-  const [amt,    setAmt]   = useState("0.01");
-  const [bmsg,   setBmsg]  = useState(null);
-  const [wallet, setWallet]= useState(null);
-  const [conn,   setConn]  = useState(false);
-  const [log,    setLog]   = useState([{ts:ts(),msg:"PRED/MKT TERMINAL v2.5 INITIALIZED",t:"sys"}]);
-  const [claims, setClaims]= useState([]);
-  const [modal,  setModal] = useState(null);
-  const [now,    setNow]   = useState(ts());
-  const [flt,    setFlt]   = useState("ALL");
-  const [txp,    setTxp]   = useState(false);
+  const [mkts,setMkts]=useState(initMkts);
+  const [tab,setTab]=useState("ALL");        // ALL | ENERGY | METALS | AGRI
+  const [modeTab,setModeTab]=useState("ROUNDS");
+  const [deepId,setDeepId]=useState(null);
+  const [botTab,setBotTab]=useState("POSITIONS");
+  const [stake,setStake]=useState("0.01");
+  const [execMsg,setExecMsg]=useState(null);
+  const [wallet,setWallet]=useState(null);
+  const [conn,setConn]=useState(false);
+  const [positions,setPositions]=useState([]);
+  const [settled,setSettled]=useState([]);
+  const [modal,setModal]=useState(null);
+  const [now,setNow]=useState(ts());
+  const [txp,setTxp]=useState(false);
 
   const logRef=useRef(null);
-  const mkRef=useRef(mkts); mkRef.current=mkts;
-
-  const addLog=useCallback((msg,t="msg")=>{
-    setLog(p=>{ const n=[...p,{ts:ts(),msg,t}]; return n.length>120?n.slice(-120):n; });
-  },[]);
+  const mkRef=useRef(mkts);mkRef.current=mkts;
+  const posRef=useRef(positions);posRef.current=positions;
 
   /* Clock */
   useEffect(()=>{
     const id=setInterval(()=>{
       setNow(ts());
       setMkts(prev=>prev.map(m=>{
-        let tl=Math.max(0,m.tl-1), phase=m.phase, rid=m.rid, sp=m.sp, pl=m.pl, ps=m.ps, last=m.last;
-        if(tl>LOCK && phase!=="OPEN"){ phase="OPEN"; }
-        else if(tl<=LOCK&&tl>0&&phase==="OPEN"){
-          phase="LOCKED";
-          addLog(`[${m.sym}] ROUND #${rid} LOCKED — BETS CLOSED`,"warn");
-        } else if(tl===0&&phase!=="RESOLVED"){
+        let{tl,phase,rid,sp,pl,ps,last,film}=m;
+        tl=Math.max(0,tl-1);
+        if(tl>LOCK&&phase!=="OPEN")phase="OPEN";
+        else if(tl<=LOCK&&tl>0&&phase==="OPEN")phase="LOCKED";
+        else if(tl===0&&phase!=="RESOLVED"){
           phase="RESOLVED";
           const dir=m.lp>sp?"LONG":"SHORT";
-          const tot=pl+ps, wp=dir==="LONG"?pl:ps;
-          const mult=wp>0?r4(tot/wp):0;
+          const tot=pl+ps,wp=dir==="LONG"?pl:ps;
+          const mult=wp>0?+(tot/wp).toFixed(3):0;
           last={rid,sp,ep:m.lp,dir,tot,mult};
-          addLog(`[${m.sym}] ROUND #${rid} → ${dir} WINS | Pool $${tot.toFixed(2)}`,"sys");
+          film=[...film.slice(1),dir];
+          // settle positions
           setTimeout(()=>{
+            setPositions(pp=>pp.map(p=>{
+              if(p.assetId===m.id&&p.rid===rid&&p.status==="OPEN"){
+                const win=p.side===dir;
+                const pnl=win?+(p.stake*mult-p.stake).toFixed(4):+(-p.stake).toFixed(4);
+                const settled2={...p,status:win?"WIN":"LOSS",pnl,mult};
+                setSettled(s=>[settled2,...s].slice(0,50));
+                return settled2;
+              }
+              return p;
+            }));
             setMkts(pp=>pp.map(mm=>mm.id===m.id?{
               ...mm,phase:"OPEN",rid:mm.rid+1,sp:mm.lp,tl:ROUND,
-              pl:+(Math.random()*300).toFixed(2),ps:+(Math.random()*250).toFixed(2),hist:[mm.lp],
+              pl:+(Math.random()*400).toFixed(2),ps:+(Math.random()*350).toFixed(2),
+              hist:[mm.lp],
             }:mm));
-            addLog(`[${m.sym}] ROUND #${rid+1} OPENED AT $${fp(m.lp)}`);
           },1200);
         }
-        return {...m,tl,phase,rid,sp,pl,ps,last};
+        return{...m,tl,phase,rid,sp,pl,ps,last,film};
       }));
     },1000);
-    return ()=>clearInterval(id);
-  },[addLog]);
+    return()=>clearInterval(id);
+  },[]);
 
-  /* Price */
+  /* Price tick */
   useEffect(()=>{
     const id=setInterval(()=>{
       setMkts(prev=>prev.map(m=>{
-        const lp=r4(nxt(m.lp,m.vol));
+        const lp=+nxt(m.lp,m.vol).toFixed(m.lp>=100?2:4);
         const hist=[...m.hist,lp];
-        return {...m,lp,hist:hist.length>150?hist.slice(-150):hist};
+        return{...m,lp,hist:hist.length>180?hist.slice(-180):hist};
       }));
     },2000);
-    return ()=>clearInterval(id);
+    return()=>clearInterval(id);
   },[]);
 
-  /* Log scroll */
-  useEffect(()=>{ if(logRef.current) logRef.current.scrollTop=logRef.current.scrollHeight; },[log]);
-
-  /* MetaMask connect */
+  /* Wallet */
   const connectWallet=useCallback(async()=>{
-    if(!window.ethereum){
-      setModal({title:"METAMASK NOT FOUND",body:"MetaMask is required for on-chain betting. Install it at <strong>metamask.io</strong>, then reload."});
-      return;
-    }
+    if(!window.ethereum){setModal({title:"METAMASK REQUIRED",body:"MetaMask browser extension is required to place on-chain positions. Install at <strong>metamask.io</strong> and reload."});return;}
     setConn(true);
     try{
-      const [addr]=await window.ethereum.request({method:"eth_requestAccounts"});
-      const chainHex=await window.ethereum.request({method:"eth_chainId"});
-      const chainId=parseInt(chainHex,16);
+      const[addr]=await window.ethereum.request({method:"eth_requestAccounts"});
+      const ch=parseInt(await window.ethereum.request({method:"eth_chainId"}),16);
       const balHex=await window.ethereum.request({method:"eth_getBalance",params:[addr,"latest"]});
       const bal=(parseInt(balHex,16)/1e18).toFixed(4);
-      setWallet({address:addr,bal,chainId});
-      addLog(`WALLET CONNECTED ${fa(addr)} | ${CHAINS[chainId]||"Chain "+chainId} | ${bal} ETH`,"sys");
+      setWallet({address:addr,bal,chainId:ch});
       window.ethereum.on("accountsChanged",a=>{
-        if(!a.length){setWallet(null);addLog("WALLET DISCONNECTED","warn");}
-        else{setWallet(w=>({...w,address:a[0]}));addLog(`ACCOUNT → ${fa(a[0])}`,"sys");}
+        if(!a.length)setWallet(null);
+        else setWallet(w=>({...w,address:a[0]}));
       });
-      window.ethereum.on("chainChanged",c=>{
-        const cid=parseInt(c,16);
-        setWallet(w=>({...w,chainId:cid}));
-        addLog(`NETWORK → ${CHAINS[cid]||"Chain "+cid}`,"warn");
-      });
-    }catch(e){ addLog(`CONNECT FAILED: ${e.message}`,"err"); }
+      window.ethereum.on("chainChanged",c=>setWallet(w=>({...w,chainId:parseInt(c,16)})));
+    }catch(e){setModal({title:"CONNECTION FAILED",body:e.message});}
     setConn(false);
-  },[addLog]);
+  },[]);
 
-  const CHAINS={1:"MAINNET",5:"GOERLI",11155111:"SEPOLIA",137:"POLYGON",42161:"ARBITRUM",10:"OPTIMISM",8453:"BASE",56:"BSC"};
+  /* Place */
+  const placeBet=useCallback(async(side,assetId)=>{
+    const m=mkRef.current.find(x=>x.id===assetId);
+    if(!m)return;
+    if(m.phase!=="OPEN"){setExecMsg({t:`MARKET ${m.phase} — WAIT FOR NEXT ROUND`,c:"#FF7E00"});setTimeout(()=>setExecMsg(null),3000);return;}
+    const a=parseFloat(stake);
+    if(!a||a<=0){setExecMsg({t:"INVALID STAKE AMOUNT",c:"#FF7E00"});setTimeout(()=>setExecMsg(null),3000);return;}
 
-  /* Place Bet */
-  const placeBet=useCallback(async side=>{
-    const m=mkRef.current.find(x=>x.id===active);
-    if(!m) return;
-    if(m.phase!=="OPEN"){ setBmsg({t:`⚠ BETTING ${m.phase}`,c:"#FF8800"}); setTimeout(()=>setBmsg(null),3000); return; }
-    const a=parseFloat(amt);
-    if(!a||a<=0){ setBmsg({t:"⚠ INVALID AMOUNT",c:"#FF8800"}); setTimeout(()=>setBmsg(null),3000); return; }
+    const pos={id:Date.now(),assetId:m.id,sym:m.sym,side,stake:a,rid:m.rid,sp:m.lp,ts:ts(),status:"OPEN",pnl:null,mult:null};
 
     if(wallet&&window.ethereum&&CONTRACT!=="0x0000000000000000000000000000000000000000"){
       setTxp(true);
-      addLog(`TX → ${side} ${a} ETH on ${m.sym} Round #${m.rid}`,"warn");
       try{
-        const mIdx=MKTS_DEF.findIndex(x=>x.id===active);
-        const sideN=side==="LONG"?0:1;
-        const weiHex="0x"+Math.floor(a*1e18).toString(16);
-        const data="0x1b9a9323"+mIdx.toString(16).padStart(64,"0")+sideN.toString(16).padStart(64,"0");
-        const txHash=await window.ethereum.request({method:"eth_sendTransaction",params:[{
-          from:wallet.address,to:CONTRACT,value:weiHex,data
-        }]});
-        addLog(`TX SUBMITTED ${txHash.slice(0,18)}…`,"sys");
-        setBmsg({t:`✓ TX ${txHash.slice(0,14)}…`,c:"#00FF41"});
-        setClaims(p=>[...p,{id:active,sym:m.sym,rid:m.rid,amt:+(a*1.85).toFixed(4),tx:txHash}]);
-      }catch(e){
-        addLog(`TX FAILED: ${e.message}`,"err");
-        setBmsg({t:"⚠ TX REJECTED",c:"#FF2233"});
-      }
+        const idx=ASSETS.findIndex(x=>x.id===assetId);
+        const data="0x1b9a9323"+idx.toString(16).padStart(64,"0")+(side==="LONG"?0:1).toString(16).padStart(64,"0");
+        const tx=await window.ethereum.request({method:"eth_sendTransaction",params:[{from:wallet.address,to:CONTRACT,value:"0x"+Math.floor(a*1e18).toString(16),data}]});
+        pos.tx=tx;
+        setExecMsg({t:`TX SUBMITTED ${tx.slice(0,12)}…`,c:"#00CC44"});
+      }catch(e){setExecMsg({t:`TX REJECTED`,c:"#FF3333"});setTxp(false);return;}
       setTxp(false);
-    } else {
-      /* Simulation */
-      const idx=MKTS_DEF.findIndex(x=>x.id===active);
+    }else{
+      setExecMsg({t:`${side} ${a} ETH — SIMULATION MODE`,c:"#00CC44"});
+      const idx=ASSETS.findIndex(x=>x.id===assetId);
       setMkts(prev=>prev.map((mm,i)=>i===idx?{
         ...mm,
         pl:side==="LONG"?+(mm.pl+a).toFixed(4):mm.pl,
         ps:side==="SHORT"?+(mm.ps+a).toFixed(4):mm.ps,
       }:mm));
-      addLog(`[SIM] ${side} ${a} ETH on ${m.sym} #${m.rid}${!wallet?" — connect wallet for real bets":""}`);
-      setBmsg({t:`✓ ${side} ${a} ETH (SIMULATION)`,c:"#00FF41"});
-      setClaims(p=>[...p,{id:active,sym:m.sym,rid:m.rid,amt:+(a*1.9).toFixed(4),tx:null}]);
     }
-    setTimeout(()=>setBmsg(null),4000);
-  },[wallet,active,amt,addLog]);
+    setPositions(p=>[pos,...p].slice(0,100));
+    setTimeout(()=>setExecMsg(null),4000);
+  },[wallet,stake]);
 
-  /* Claim */
-  const claim=useCallback(async c=>{
-    if(!wallet){ addLog("Connect wallet to claim","warn"); return; }
-    setTxp(true);
-    addLog(`CLAIMING ${c.amt} ETH from ${c.sym} #${c.rid}`,"warn");
-    try{
-      if(window.ethereum&&CONTRACT!=="0x0000000000000000000000000000000000000000"){
-        const mIdx=MKTS_DEF.findIndex(x=>x.id===c.id);
-        const data="0x2e7ba6ef"+mIdx.toString(16).padStart(64,"0")+c.rid.toString(16).padStart(64,"0");
-        const tx=await window.ethereum.request({method:"eth_sendTransaction",params:[{from:wallet.address,to:CONTRACT,value:"0x0",data}]});
-        addLog(`CLAIM TX ${tx.slice(0,18)}…`,"sys");
-      } else {
-        addLog(`[SIM] CLAIMED ${c.amt} ETH from ${c.sym}`,"sys");
-      }
-      setClaims(p=>p.filter(x=>!(x.id===c.id&&x.rid===c.rid)));
-      setBmsg({t:`✓ CLAIMED ${c.amt} ETH`,c:"#FFD700"});
-    }catch(e){ addLog(`CLAIM FAILED: ${e.message}`,"err"); }
-    setTxp(false);
-    setTimeout(()=>setBmsg(null),4000);
-  },[wallet,addLog]);
+  const claimPos=useCallback(async(pos)=>{
+    if(!wallet){setModal({title:"WALLET REQUIRED",body:"Connect MetaMask to claim on-chain winnings."});return;}
+    setPositions(p=>p.filter(x=>x.id!==pos.id));
+    setExecMsg({t:`CLAIMED ${pos.pnl>0?"+":""}${pos.pnl} ETH FROM ${pos.sym}`,c:"#D4AF37"});
+    setTimeout(()=>setExecMsg(null),4000);
+  },[wallet]);
 
   /* Derived */
-  const am=useMemo(()=>mkts.find(m=>m.id===active),[mkts,active]);
-  const filtered=useMemo(()=>flt==="ALL"?mkts:mkts.filter(m=>m.cat===flt),[mkts,flt]);
-  const cats=["ALL","CRYPTO","METALS","ENERGY","FOREX","INDEX"];
+  const deepMkt=useMemo(()=>mkts.find(m=>m.id===deepId),[mkts,deepId]);
+  const dm=deepMkt;
+  const openPos=positions.filter(p=>p.status==="OPEN");
+  const wins=settled.filter(p=>p.status==="WIN");
+
+  const filtered=useMemo(()=>
+    tab==="ALL"?mkts:mkts.filter(m=>m.cat===tab)
+  ,[mkts,tab]);
+
+  const bycat=useMemo(()=>{
+    const cats=["METALS","ENERGY","AGRI"];
+    return cats.map(c=>({cat:c,items:filtered.filter(m=>m.cat===c)})).filter(g=>g.items.length>0);
+  },[filtered]);
+
   const chainName=wallet?(CHAINS[wallet.chainId]||"Chain "+wallet.chainId):"";
 
-  const up   = am?am.lp>=am.sp:true;
-  const delt = am?am.lp-am.sp:0;
-  const dPct = am&&am.sp?(delt/am.sp)*100:0;
-  const tot  = am?am.pl+am.ps:0;
-  const lPct = tot>0?(am.pl/tot)*100:50;
-  const phCl = am?.phase==="OPEN"?"o":am?.phase==="LOCKED"?"l":"r";
-  const phSy = am?.phase==="OPEN"?"●":am?.phase==="LOCKED"?"⬡":"■";
+  /* Breadcrumb */
+  const bcPath=useMemo(()=>{
+    if(dm)return`COMMODITIES > ${dm.cat} > ${dm.sym} > 5M ROUND #${dm.rid}`;
+    return`COMMODITIES > ${tab==="ALL"?"ALL MARKETS":tab}`;
+  },[dm,tab]);
+
+  /* Ribbon items */
+  const ribItems=["XAU","XCU","CL","BRN","ZC","XAG","NG","ZS","ZW"];
 
   return(
-    <div id="root">
-      {/* Command bar */}
-      <div className="cmd-bar">
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <span className="cmd-logo">PRED<span>/</span>MKT</span>
-          <span style={{color:"#6a8dd8",fontSize:11}}>DECENTRALIZED PREDICTION MARKETS TERMINAL</span>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:14,fontSize:11}}>
-          <span>{now}</span>
-          <span style={{color:"#334"}}>|</span>
-          <span>{mkts.filter(m=>m.phase==="OPEN").length} OPEN / {mkts.length} MARKETS</span>
-          <span style={{color:"#334"}}>|</span>
-          <span style={{color:wallet?"#00FF41":"#FF8800"}} className={wallet?"":"blink"}>
-            {wallet?`⟠ ${fa(wallet.address)}`:"○ WALLET OFFLINE"}
-          </span>
-        </div>
-      </div>
-
-      {/* Sub bar */}
-      <div className="sub-bar">
-        {mkts.slice(0,6).map(m=>{
-          const u=m.lp>=m.sp;
-          return <span key={m.id} style={{color:u?"#00CC33":"#CC0011"}}>{m.sym} {fp(m.lp)} {u?"▲":"▼"}</span>;
-        })}
-        <span style={{marginLeft:"auto",color:"#335",fontSize:10}}>PRED/MKT v2.5 — CONTRACT: {CONTRACT.slice(0,10)}…</span>
-      </div>
-
-      {/* Ticker */}
-      <div className="ticker-wrap">
-        <div className="ticker-inner">
-          {[...mkts,...mkts,...mkts].map((m,i)=>{
-            const u=m.lp>=m.sp;
-            return <span key={i} style={{display:"inline-flex",gap:6}}>
-              <span className="tick-sym">{m.sym}</span>
-              <span className={u?"tick-up":"tick-dn"}>{fp(m.lp)} {u?"▲":"▼"} {Math.abs((m.lp-m.sp)/m.sp*100).toFixed(2)}%</span>
-            </span>;
+    <div id="app">
+      {/* ── TICKER RIBBON ── */}
+      <div className="ribbon">
+        <div className="ribbon-inner">
+          {[...ribItems,...ribItems,...ribItems].map((id,i)=>{
+            const m=mkts.find(x=>x.id===id);if(!m)return null;
+            const u=m.lp>=m.sp,d=m.lp-m.sp,pct=(d/m.sp*100);
+            return(
+              <span key={i} className="rib-item">
+                <span className="rib-sym">{m.sym}</span>
+                <span className={`rib-price ${u?"up":"dn"}`}>{fp(m.lp)}</span>
+                <span className={`rib-chg ${u?"up":"dn"}`}>{pct>=0?"+":""}{pct.toFixed(2)}%</span>
+              </span>
+            );
           })}
         </div>
       </div>
 
-      {/* Main */}
-      <div className="main-wrap">
-
-        {/* Sidebar */}
-        <div className="sidebar">
-          {/* Wallet */}
-          <div className="panel">
-            <div className="ph" style={{background:wallet?"#002a10":"#001040"}}>
-              <span>{wallet?"WALLET CONNECTED":"CONNECT WALLET"}</span>
-              <span style={{color:wallet?"#00FF41":"#00CCFF",fontSize:10}}>{wallet?chainName:"WEB3"}</span>
-            </div>
-            <div className="wsec">
-              {!wallet?(
-                <button className={`btn-wl${conn?" pulse":""}`} onClick={connectWallet} disabled={conn}>
-                  {conn?"CONNECTING…":"⟠ CONNECT METAMASK"}
-                </button>
-              ):(
-                <>
-                  <div className="wrow"><span className="wl">ADDRESS</span><span className="wv">{fa(wallet.address)}</span></div>
-                  <div className="wrow"><span className="wl">BALANCE</span><span className="wv">{wallet.bal} ETH</span></div>
-                  <div className="wrow"><span className="wl">NETWORK</span><span className="wv">{chainName}</span></div>
-                  <div className="wrow"><span className="wl">CONTRACT</span><span className="wv" style={{fontSize:9}}>{CONTRACT.slice(0,10)}…</span></div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Filter */}
-          <div className="panel">
-            <div className="ph"><span>FILTER MARKETS</span></div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:3,padding:6}}>
-              {cats.map(c=>(
-                <button key={c} onClick={()=>setFlt(c)}
-                  style={{padding:"2px 7px",fontSize:10,
-                    background:flt===c?"#003399":"#0a0a14",
-                    color:flt===c?"#fff":"#556",
-                    border:`1px solid ${flt===c?"#003399":"#1a1a2e"}`}}>
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Market list */}
-          <div className="panel" style={{flex:1,overflowY:"auto"}}>
-            <div className="ph"><span>MARKETS ({filtered.length})</span><span style={{color:"#6a8dd8",fontSize:10}}>{flt}</span></div>
-            {filtered.map(m=>{
-              const u=m.lp>=m.sp, d=m.lp-m.sp, pct=(d/m.sp*100);
-              return(
-                <div key={m.id} className={`mcard${active===m.id?" act":""}`} onClick={()=>setActive(m.id)}>
-                  <div className="mc-top">
-                    <span className="mc-sym">{m.icon} {m.sym}</span>
-                    <span className={`mc-price ${u?"up":"dn"}`}>{fp(m.lp)}</span>
-                  </div>
-                  <div className="mc-bot">
-                    <span className="mc-name">{m.name}</span>
-                    <span style={{fontSize:9,padding:"1px 5px",border:"1px solid",color:m.phase==="OPEN"?"#00CC33":m.phase==="LOCKED"?"#FFB100":"#FF2233",borderColor:m.phase==="OPEN"?"#00CC33":m.phase==="LOCKED"?"#FFB100":"#FF2233"}}>
-                      {m.phase==="OPEN"?"●":m.phase==="LOCKED"?"⬡":"■"} {m.phase}
-                    </span>
-                  </div>
-                  <div style={{width:"100%",height:28,marginBottom:3}}><Spark data={m.hist} height={28} mini/></div>
-                  <div className="pool-mini">
-                    <span style={{color:"#00AA22"}}>L ${m.pl.toFixed(2)}</span>
-                    <span style={{color:"#666"}}>{ft(m.tl)}</span>
-                    <span style={{color:"#AA0011"}}>S ${m.ps.toFixed(2)}</span>
-                  </div>
-                </div>
-              );
-            })}
+      {/* ── COMMAND HEADER ── */}
+      <div className="cmd-header">
+        <div className="cmd-logo">
+          <div>
+            <div className="cmd-logo-text">COMMOD/TERM</div>
+            <div className="cmd-logo-sub">PREDICTION MARKETS</div>
           </div>
         </div>
-
-        {/* Center */}
-        <div className="center-col">
-          {am&&(<>
-            {/* Price hero */}
-            <div className="price-hero">
-              <div className="ph-row">
-                <div>
-                  <div className="ph-sym">{am.icon} {am.sym} — {am.name.toUpperCase()}</div>
-                  <div className={`ph-price ${up?"up":"dn"}`}>${fp(am.lp)}</div>
-                </div>
-                <div style={{paddingBottom:4}}>
-                  <div className={`ph-delta ${up?"up":"dn"}`}>
-                    {delt>=0?"▲":"▼"} {Math.abs(delt).toFixed(am.lp>=100?2:4)} ({dPct.toFixed(3)}%)
-                  </div>
-                  <div style={{fontSize:10,color:"#444",marginTop:2}}>VS ROUND START · {am.cat}</div>
-                </div>
-                <div className="ph-right">
-                  <div style={{fontSize:10,color:"#555",letterSpacing:1}}>TIME REMAINING</div>
-                  <div className="ph-time" style={{color:am.phase==="LOCKED"?"#FF2233":"#FFB100"}}>{ft(am.tl)}</div>
-                  <div className={`ph-phase badge ${phCl}`} style={{color:am.phase==="OPEN"?"#00CC33":am.phase==="LOCKED"?"#FFB100":"#FF2233",borderColor:am.phase==="OPEN"?"#00CC33":am.phase==="LOCKED"?"#FFB100":"#FF2233"}}>
-                    {phSy} {am.phase} · ROUND #{am.rid}
-                  </div>
-                </div>
-              </div>
-              <div className="prog">
-                <div className="prog-fill" style={{width:`${((ROUND-am.tl)/ROUND)*100}%`,background:am.phase==="LOCKED"?"#FF2233":"#FFB100"}}/>
-              </div>
+        <div className="cmd-tabs">
+          {[["ALL","★","ALL"],["ENERGY","1","ENERGY"],["METALS","2","METALS"],["AGRI","3","AGRI"]].map(([v,k,label])=>(
+            <div key={v} className={`cmd-tab${tab===v?" active":""}`} onClick={()=>{setTab(v);setDeepId(null);}}>
+              <span>{label}</span>
+              <span className="kbshort">{k}</span>
             </div>
-
-            {/* Chart */}
-            <div className="panel">
-              <div className="ph"><span>PRICE CHART — {am.sym}</span><span style={{fontSize:10,color:"#6a8dd8"}}>{am.hist.length} TICKS · 2s INTERVAL</span></div>
-              <div style={{paddingTop:4}}><Spark data={am.hist} height={95}/></div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#334",padding:"3px 8px 5px"}}>
-                <span>T-{am.hist.length*2}s</span>
-                <span>LO ${fp(Math.min(...am.hist))}</span>
-                <span>HI ${fp(Math.max(...am.hist))}</span>
-                <span>NOW</span>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="panel">
-              <div className="ph"><span>ROUND STATISTICS</span><span style={{fontSize:10,color:"#6a8dd8"}}>ROUND #{am.rid}</span></div>
-              <div className="sgrid">
-                {[
-                  ["START PRICE",`$${fp(am.sp)}`],
-                  ["LIVE PRICE", `$${fp(am.lp)}`],
-                  ["TOTAL POOL", `$${tot.toFixed(2)}`],
-                  ["LONG POOL",  `$${am.pl.toFixed(2)}`],
-                  ["SHORT POOL", `$${am.ps.toFixed(2)}`],
-                  ["LONG ODDS",  am.pl>0?`${(tot/am.pl).toFixed(3)}x`:"N/A"],
-                  ["SHORT ODDS", am.ps>0?`${(tot/am.ps).toFixed(3)}x`:"N/A"],
-                  ["PHASE",      am.phase],
-                ].map(([k,v])=>(
-                  <div key={k} className="sbox">
-                    <div className="slbl">{k}</div>
-                    <div className="sval" style={{fontSize:v.length>8?11:13}}>{v}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="psec">
-                <div className="plbl">
-                  <span style={{color:"#00FF41"}}>▲ LONG ${am.pl.toFixed(2)} ({lPct.toFixed(1)}%)</span>
-                  <span style={{color:"#FF2233"}}>▼ SHORT ${am.ps.toFixed(2)} ({(100-lPct).toFixed(1)}%)</span>
-                </div>
-                <div className="pbar"><div className="plong" style={{width:`${lPct}%`}}/></div>
-              </div>
-            </div>
-
-            {/* Last result */}
-            {am.last&&(
-              <div className="panel">
-                <div className="ph"><span>LAST SETTLED — ROUND #{am.last.rid}</span></div>
-                <div className="rgrid">
-                  {[["START",`$${fp(am.last.sp)}`],["END",`$${fp(am.last.ep)}`],["RESULT",am.last.dir],["POOL",`$${am.last.tot.toFixed(2)}`],["PAYOUT",`${am.last.mult}x`]].map(([k,v])=>(
-                    <div key={k} className="rbox">
-                      <div className="rl">{k}</div>
-                      <div className="rv" style={{color:v==="LONG"?"#00FF41":v==="SHORT"?"#FF2233":"#FFB100"}}>{v}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>)}
-
-          {/* Log */}
-          <div className="panel" style={{flex:1,minHeight:140}}>
-            <div className="ph"><span>TERMINAL LOG</span><span style={{fontSize:10,color:"#6a8dd8"}}>{log.length} ENTRIES</span></div>
-            <div className="log-wrap" ref={logRef}>
-              {log.map((l,i)=>(
-                <div key={i} className="lline">
-                  <span className="lts">{l.ts}</span>
-                  <span className={`l${l.t}`}>&gt; {l.msg}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
-
-        {/* Trade col */}
-        <div className="trade-col">
-
-          {/* Trade */}
-          <div className="panel">
-            <div className="ph gh">
-              <span>PLACE BET — {am?.sym??""}</span>
-              <span style={{fontSize:10}}>RND #{am?.rid??""}</span>
+        <div className="cmd-right">
+          {!wallet?(
+            <div className={`wallet-btn${conn?" pulse":""}`} onClick={connectWallet}>
+              <div className="wallet-dot" style={{background:"#FF7E00"}}/>
+              {conn?"CONNECTING…":"CONNECT WALLET"}
             </div>
-            <div className="tsec">
-              <div className="tlbl">STAKE (ETH)</div>
-              <input type="number" className="sinput" min="0.001" step="0.001"
-                value={amt} onChange={e=>setAmt(e.target.value)}/>
-              <div className="qbets">
-                {["0.005","0.01","0.05","0.1"].map(v=>(
-                  <button key={v} className={`qb${amt===v?" aq":""}`} onClick={()=>setAmt(v)}>{v}</button>
-                ))}
-              </div>
-              <button className="btn-lo" onClick={()=>placeBet("LONG")} disabled={am?.phase!=="OPEN"||txp}>
-                {txp?"TX PENDING…":"▲ LONG"}
-              </button>
-              <button className="btn-sh" onClick={()=>placeBet("SHORT")} disabled={am?.phase!=="OPEN"||txp}>
-                {txp?"TX PENDING…":"▼ SHORT"}
-              </button>
-              {am?.phase!=="OPEN"&&!bmsg&&(
-                <div style={{marginTop:8,padding:"6px 10px",background:"#1a0800",border:"1px solid #FF8800",color:"#FF8800",fontSize:11,textAlign:"center"}}>
-                  {am?.phase==="LOCKED"?"⬡ LOCKED — NEXT ROUND SOON":"■ RESOLVING…"}
-                </div>
-              )}
-              {bmsg&&<div className="bmsg" style={{color:bmsg.c,borderColor:bmsg.c}}>{bmsg.t}</div>}
-              {!wallet&&(
-                <div style={{marginTop:8,padding:"6px 8px",background:"#000820",border:"1px solid #002266",color:"#6a8dd8",fontSize:10,textAlign:"center",lineHeight:1.6}}>
-                  Simulation mode active.<br/>Connect MetaMask for on-chain bets.
-                </div>
-              )}
+          ):(
+            <div className="wallet-btn conn">
+              <div className="wallet-dot"/>
+              <span style={{fontFamily:"var(--mono)",fontSize:10}}>{fa(wallet.address)}</span>
+              <span style={{color:"var(--gray2)",fontSize:9,marginLeft:4}}>{wallet.bal} ETH</span>
+              <span style={{color:"var(--gray2)",fontSize:9,marginLeft:4}}>{chainName}</span>
             </div>
-          </div>
-
-          {/* Claims */}
-          <div className="panel">
-            <div className="ph ah">
-              <span>CLAIMABLE WINNINGS</span>
-              <span style={{fontSize:10}}>{claims.length} PENDING</span>
-            </div>
-            <div className="csec">
-              {claims.length===0?(
-                <div style={{fontSize:11,color:"#334",textAlign:"center",padding:"8px 0"}}>NO PENDING CLAIMS</div>
-              ):claims.map((c,i)=>(
-                <div key={i} style={{marginBottom:8,padding:"6px 8px",background:"#0d0a00",border:"1px solid #3a2800"}}>
-                  <div className="crow"><span className="cl2">MARKET</span><span className="cv2">{c.sym}</span></div>
-                  <div className="crow"><span className="cl2">ROUND</span><span className="cv2">#{c.rid}</span></div>
-                  <div className="crow"><span className="cl2">AMOUNT</span><span style={{color:"#FFD700"}}>{c.amt} ETH</span></div>
-                  {c.tx&&<div className="crow"><span className="cl2">TX</span><span style={{color:"#555",fontSize:9}}>{c.tx.slice(0,14)}…</span></div>}
-                  <button className="btn-cl" onClick={()=>claim(c)} disabled={txp||!wallet}>
-                    {wallet?"⬡ CLAIM WINNINGS":"CONNECT WALLET FIRST"}
-                  </button>
-                </div>
-              ))}
-              {claims.length>0&&(
-                <div style={{fontSize:10,color:"#445",textAlign:"center",marginTop:4}}>
-                  TOTAL CLAIMABLE: {claims.reduce((a,c)=>a+c.amt,0).toFixed(4)} ETH
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Market info */}
-          <div className="panel">
-            <div className="ph"><span>MARKET INFO</span></div>
-            <div className="pb">
-              {am&&[
-                ["CONTRACT",  CONTRACT.slice(0,12)+"…"],
-                ["ROUND LEN", "5:00 MIN"],
-                ["LOCK PHASE","1:00 MIN"],
-                ["SETTLEMENT","LIVE PRICE"],
-                ["MIN BET",   "0.001 ETH"],
-                ["CATEGORY",  am.cat],
-                ["ROUND #",   am.rid],
-              ].map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:11}}>
-                  <span style={{color:"#555"}}>{k}</span><span style={{color:"#FFB100"}}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Phase guide */}
-          <div className="panel">
-            <div className="ph"><span>PHASE GUIDE</span></div>
-            <div className="pb" style={{fontSize:11}}>
-              <div style={{marginBottom:5}}><span style={{color:"#00FF41"}}>● OPEN</span><span style={{color:"#555"}}> 0:00→4:00 | Bets accepted</span></div>
-              <div style={{marginBottom:5}}><span style={{color:"#FFB100"}}>⬡ LOCKED</span><span style={{color:"#555"}}> 4:00→5:00 | No new bets</span></div>
-              <div><span style={{color:"#FF2233"}}>■ RESOLVED</span><span style={{color:"#555"}}> Winnings distributed</span></div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Status bar */}
-      <div className="status-bar">
-        <span>PRED/MKT DECENTRALIZED PREDICTION MARKETS — GITHUB PAGES READY</span>
-        <span>
-          <span className="sok">● {mkts.filter(m=>m.phase==="OPEN").length}/{mkts.length} LIVE</span>
-          <span style={{margin:"0 8px",color:"#222"}}>|</span>
-          <span className={wallet?"sok":"swarn"}>{wallet?`⟠ ${chainName}`:"○ WALLET OFFLINE"}</span>
+      {/* ── BREADCRUMB ── */}
+      <div className="breadcrumb">
+        <div className="bc-path">{bcPath.split(">").map((seg,i,arr)=>(
+          <span key={i}>{i>0?" > ":""}{i===arr.length-1?<span>{seg.trim()}</span>:seg.trim()}</span>
+        ))}</div>
+        <div className="bc-right">
+          <div className="bc-toggle">
+            {["ROUNDS","MACRO"].map(m=>(
+              <button key={m} className={`bc-tog-btn${modeTab===m?" active":""}`} onClick={()=>setModeTab(m)}>{m}</button>
+            ))}
+          </div>
+          <span style={{color:"var(--gray2)",fontFamily:"var(--mono)",fontSize:10}}>{now}</span>
+          <span style={{color:"var(--green)",fontSize:10,fontFamily:"var(--sans)"}}>{mkts.filter(m=>m.phase==="OPEN").length} OPEN</span>
+        </div>
+      </div>
+
+      {/* ── MAIN ── */}
+      <div className="main">
+
+        {/* LEFT SIDEBAR */}
+        <div className="sidebar">
+          <div className="sb-head">
+            <span className="sb-title">MARKET MONITOR</span>
+            <span className="sb-count">{mkts.length}</span>
+          </div>
+          <div className="sb-list">
+            {["METALS","ENERGY","AGRI"].map(cat=>(
+              <div key={cat}>
+                <div className={`sb-cat cat-${cat.toLowerCase()}`} style={{color:CAT_COLOR[cat]}}>{cat}</div>
+                {mkts.filter(m=>m.cat===cat).map(m=>{
+                  const u=m.lp>=m.sp,d=m.lp-m.sp,pct=(d/m.sp*100);
+                  return(
+                    <div key={m.id} className={`sb-row sb-row-cat cat-${cat.toLowerCase()}${deepId===m.id?" active":""}`}
+                      onClick={()=>setDeepId(deepId===m.id?null:m.id)}>
+                      <span className="sb-sym">{m.sym}</span>
+                      <span className={`sb-price ${u?"up":"dn"}`}>{fp(m.lp)}</span>
+                      <span className="sb-name">{m.name}</span>
+                      <span className={`sb-phase ${phaseCls(m.phase)}`}>{phaseIco(m.phase)} {ft(m.tl)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CENTER */}
+        <div className="center">
+          {!dm?(
+            /* GRID VIEW */
+            <div className="grid-view">
+              {modeTab==="MACRO"&&(
+                <div style={{padding:"40px",textAlign:"center",color:"var(--gray2)",fontFamily:"var(--sans)",letterSpacing:"1px",fontSize:11}}>
+                  MACRO EVENT MARKETS — COMING SOON<br/>
+                  <span style={{fontSize:9,marginTop:4,display:"block"}}>USDA REPORTS · OPEC MEETINGS · FED DECISIONS</span>
+                </div>
+              )}
+              {modeTab==="ROUNDS"&&bycat.map(({cat,items})=>(
+                <div key={cat} className="grid-section">
+                  <div className="grid-section-head">
+                    <div className="grid-section-label" style={{color:CAT_COLOR[cat]}}>{cat}</div>
+                    <div className="grid-section-line" style={{background:CAT_COLOR[cat],opacity:.2}}/>
+                    <span style={{fontSize:9,color:"var(--gray2)",fontFamily:"var(--sans)",letterSpacing:".5px",whiteSpace:"nowrap"}}>{items.length} MARKETS</span>
+                  </div>
+                  <div className={`grid-row cols-${Math.min(items.length,4)}`}>
+                    {items.map(m=>{
+                      const u=m.lp>=m.sp,d=m.lp-m.sp,pct=(d/m.sp*100);
+                      const tot=m.pl+m.ps,lp2=tot>0?(m.pl/tot)*100:50;
+                      return(
+                        <div key={m.id} className={`mkt-card${deepId===m.id?" active":""}`}
+                          onClick={()=>setDeepId(m.id)}>
+                          <div className={`mkt-card-top cat-${cat.toLowerCase()}`}/>
+                          <div className="card-header">
+                            <div>
+                              <div className="card-sym">{m.sym}</div>
+                              <div className="card-name">{m.name}</div>
+                            </div>
+                            <div className="card-price-block">
+                              <div className={`card-price ${u?"up":"dn"}`}>{fp(m.lp)}</div>
+                              <div className={`card-chg ${u?"up":"dn"}`}>{pct>=0?"+":""}{pct.toFixed(3)}%</div>
+                            </div>
+                          </div>
+                          <div className="card-chart">
+                            <Spark data={m.hist} height={44} mini/>
+                          </div>
+                          <div className="card-footer">
+                            <div className="card-timer" style={{color:m.phase==="LOCKED"?"#FF3333":"var(--orange)"}}>{ft(m.tl)}</div>
+                            <div className="card-sentiment">
+                              <div className="sentiment-bar">
+                                <div className="sentiment-long" style={{width:`${lp2}%`}}/>
+                              </div>
+                              <div className="sentiment-labels">
+                                <span style={{color:"var(--green)"}}>{lp2.toFixed(0)}%L</span>
+                                <span style={{color:"var(--red)"}}>{(100-lp2).toFixed(0)}%S</span>
+                              </div>
+                            </div>
+                            <div className="card-actions">
+                              <button className="card-btn btn-buy" disabled={m.phase!=="OPEN"||txp}
+                                onClick={e=>{e.stopPropagation();placeBet("LONG",m.id);}}>BUY</button>
+                              <button className="card-btn btn-sell" disabled={m.phase!=="OPEN"||txp}
+                                onClick={e=>{e.stopPropagation();placeBet("SHORT",m.id);}}>SELL</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ):(
+            /* DEEP DIVE */
+            <div className="deep-view">
+              <div className="deep-header">
+                <div className="deep-back" onClick={()=>setDeepId(null)}>‹ BACK</div>
+                <div style={{width:1,height:16,background:"var(--border)",margin:"0 4px"}}/>
+                <div className="deep-asset">{dm.sym}</div>
+                <div style={{fontSize:11,color:"var(--gray2)",fontFamily:"var(--sans)"}}>{dm.name}</div>
+                <div className={`deep-price ${dm.lp>=dm.sp?"up":"dn"}`}>{fp(dm.lp)}</div>
+                <div className={`deep-chg ${dm.lp>=dm.sp?"up":"dn"}`}>
+                  {dm.lp>=dm.sp?"+":""}{(dm.lp-dm.sp).toFixed(dm.lp>=100?2:4)} ({((dm.lp-dm.sp)/dm.sp*100).toFixed(3)}%)
+                </div>
+                <div className={`deep-phase ${phaseCls(dm.phase)}`}>{phaseIco(dm.phase)} {dm.phase} · RND #{dm.rid} · {ft(dm.tl)}</div>
+              </div>
+              <div className="deep-body">
+                <div className="deep-center">
+                  <div className="film-label">ROUND HISTORY (LAST 10)</div>
+                  <div className="filmstrip">
+                    {dm.film.map((f,i)=>(
+                      <div key={i} className={`film-box ${f==="LONG"?"film-long":f==="SHORT"?"film-short":"film-none"}`}>
+                        {f==="LONG"?"L":f==="SHORT"?"S":"—"}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="chart-label">1-MINUTE CANDLESTICK CHART — {dm.sym}</div>
+                  <div className="chart-wrap">
+                    <CandleChart data={dm.hist} height={Math.max(120,180)}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"var(--gray2)",fontFamily:"var(--sans)",marginTop:3,letterSpacing:".5px"}}>
+                    <span>LO {fp(Math.min(...dm.hist))}</span>
+                    <span>OPEN {fp(dm.sp)}</span>
+                    <span>HI {fp(Math.max(...dm.hist))}</span>
+                    <span>NOW {fp(dm.lp)}</span>
+                  </div>
+                </div>
+
+                {/* ORDER ENTRY */}
+                <div className="deep-right">
+                  <div className="order-section">
+                    <div className="order-title">ORDER ENTRY</div>
+                    <div className="order-label">STAKE (ETH)</div>
+                    <input type="number" className="order-input" value={stake}
+                      onChange={e=>setStake(e.target.value)} placeholder="0.0100"/>
+                    <div className="quick-row">
+                      {["0.005","0.01","0.05","0.1"].map(v=>(
+                        <button key={v} className={`quick-btn${stake===v?" aq":""}`} onClick={()=>setStake(v)}>{v}</button>
+                      ))}
+                    </div>
+                    <div className="exec-row">
+                      <button className="exec-long" onClick={()=>placeBet("LONG",dm.id)} disabled={dm.phase!=="OPEN"||txp}>
+                        {txp?"PENDING":"▲ LONG"}
+                      </button>
+                      <button className="exec-short" onClick={()=>placeBet("SHORT",dm.id)} disabled={dm.phase!=="OPEN"||txp}>
+                        {txp?"PENDING":"▼ SHORT"}
+                      </button>
+                    </div>
+                    {dm.phase!=="OPEN"&&!execMsg&&(
+                      <div style={{marginTop:6,padding:"5px 8px",background:"rgba(255,126,0,.08)",border:"1px solid rgba(255,126,0,.4)",color:"#FF7E00",fontSize:10,fontFamily:"var(--sans)",textAlign:"center",letterSpacing:".5px"}}>
+                        {dm.phase==="LOCKED"?"⬡ LOCKED — NEXT ROUND OPENING SOON":"■ SETTLING ROUND…"}
+                      </div>
+                    )}
+                    {execMsg&&(
+                      <div className="exec-msg" style={{color:execMsg.c,borderColor:execMsg.c}}>{execMsg.t}</div>
+                    )}
+                    {/* Payout estimate */}
+                    {parseFloat(stake)>0&&(()=>{
+                      const a=parseFloat(stake)||0;
+                      const tot=dm.pl+dm.ps;
+                      const longOdds=dm.pl>0?(tot+a)/(dm.pl+a):1;
+                      const shortOdds=dm.ps>0?(tot+a)/(dm.ps+a):1;
+                      const longRoi=((longOdds-1)*100).toFixed(1);
+                      const shortRoi=((shortOdds-1)*100).toFixed(1);
+                      return(
+                        <div className="payout-box" style={{marginTop:8}}>
+                          <div className="payout-row">
+                            <span className="payout-lbl">EST. LONG RETURN</span>
+                            <span className="payout-val positive">+{longRoi}%</span>
+                          </div>
+                          <div className="payout-row">
+                            <span className="payout-lbl">EST. SHORT RETURN</span>
+                            <span className="payout-val positive">+{shortRoi}%</span>
+                          </div>
+                          <div className="payout-row">
+                            <span className="payout-lbl">ROUND</span>
+                            <span className="payout-val orange">#{dm.rid}</span>
+                          </div>
+                          <div className="payout-row">
+                            <span className="payout-lbl">CLOSES IN</span>
+                            <span className="payout-val orange">{ft(dm.tl)}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {!wallet&&(
+                      <div style={{marginTop:8,padding:"5px 8px",background:"rgba(255,153,0,.06)",border:"1px solid rgba(255,153,0,.2)",color:"var(--gray)",fontSize:9,fontFamily:"var(--sans)",lineHeight:1.6,letterSpacing:".3px"}}>
+                        Connect MetaMask for on-chain settlement. Simulation mode active.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stats */}
+                  <div className="stats-section">
+                    <div className="order-title" style={{marginBottom:6}}>ROUND STATS</div>
+                    <div className="stats-grid">
+                      {[
+                        ["ROUND OPEN",fp(dm.sp)],
+                        ["LIVE PRICE",fp(dm.lp)],
+                        ["LONG POOL",`$${dm.pl.toFixed(2)}`],
+                        ["SHORT POOL",`$${dm.ps.toFixed(2)}`],
+                        ["TOTAL POOL",`$${(dm.pl+dm.ps).toFixed(2)}`],
+                        ["LONG ODDS",dm.pl>0?`${((dm.pl+dm.ps)/dm.pl).toFixed(3)}x`:"N/A"],
+                        ["SHORT ODDS",dm.ps>0?`${((dm.pl+dm.ps)/dm.ps).toFixed(3)}x`:"N/A"],
+                        ["UNIT",dm.unit],
+                      ].map(([k,v])=>(
+                        <div key={k} className="stat-cell">
+                          <div className="stat-lbl">{k}</div>
+                          <div className="stat-val">{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Round meter */}
+                  <div className="round-meter">
+                    <div className="meter-label">
+                      <span style={{color:"var(--gray2)",fontFamily:"var(--sans)",fontSize:9,letterSpacing:".5px"}}>ROUND PROGRESS</span>
+                      <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--orange)"}}>{ft(dm.tl)}</span>
+                    </div>
+                    <div className="meter-bar">
+                      <div className="meter-fill" style={{
+                        width:`${((ROUND-dm.tl)/ROUND)*100}%`,
+                        background:dm.phase==="LOCKED"?"#FF3333":"var(--orange)"
+                      }}/>
+                    </div>
+                    <div className="tug-section">
+                      <div className="tug-labels">
+                        <span style={{color:"var(--green)"}}>L {(()=>{const t=dm.pl+dm.ps;return t>0?(dm.pl/t*100).toFixed(1):50})()}%</span>
+                        <span style={{color:"var(--gray2)"}}>SENTIMENT</span>
+                        <span style={{color:"var(--red)"}}>S {(()=>{const t=dm.pl+dm.ps;return t>0?(dm.ps/t*100).toFixed(1):50})()}%</span>
+                      </div>
+                      <div className="tug-bar">
+                        <div className="tug-long" style={{width:`${(()=>{const t=dm.pl+dm.ps;return t>0?(dm.pl/t)*100:50})()}%`}}/>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Last result */}
+                  {dm.last&&(
+                    <div style={{padding:"8px 12px",borderBottom:"1px solid var(--border2)"}}>
+                      <div className="order-title" style={{marginBottom:6}}>LAST SETTLEMENT</div>
+                      {[
+                        ["ROUND",`#${dm.last.rid}`],
+                        ["DIRECTION",dm.last.dir],
+                        ["OPEN",fp(dm.last.sp)],
+                        ["CLOSE",fp(dm.last.ep)],
+                        ["POOL",`$${dm.last.tot.toFixed(2)}`],
+                        ["PAYOUT",`${dm.last.mult}x`],
+                      ].map(([k,v])=>(
+                        <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:10}}>
+                          <span style={{color:"var(--gray2)",fontFamily:"var(--sans)"}}>{k}</span>
+                          <span style={{fontFamily:"var(--mono)",color:v==="LONG"?"var(--green)":v==="SHORT"?"var(--red)":"var(--white)"}}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── BOTTOM TABS ── */}
+      <div className="bottom">
+        <div className="bottom-tabs">
+          {[["POSITIONS","MY POSITIONS",openPos.length],["HISTORY","ORDER HISTORY",positions.length],["WINS","SETTLED WINS",wins.length]].map(([v,label,cnt])=>(
+            <div key={v} className={`bot-tab${botTab===v?" active":""}`} onClick={()=>setBotTab(v)}>
+              {label}{cnt>0&&<span className="count">{cnt}</span>}
+            </div>
+          ))}
+          <div className="bot-tab" style={{marginLeft:"auto",borderLeft:"1px solid var(--border2)"}}
+            onClick={()=>setModal({title:"SMART CONTRACT LOG",body:`Contract: <strong>${CONTRACT}</strong><br/>All transactions are logged on-chain. Connect MetaMask and replace the contract address to enable live settlement.`})}>
+            CONTRACT LOG ▸
+          </div>
+        </div>
+        <div className="bottom-content">
+          {botTab==="POSITIONS"&&(
+            openPos.length===0?(
+              <div className="empty-state">NO OPEN POSITIONS — PLACE A BET TO BEGIN</div>
+            ):(
+              <table className="pos-table">
+                <thead><tr>
+                  <th>ASSET</th><th>SIDE</th><th>STAKE</th><th>ENTRY</th><th>LIVE</th><th>P&L</th><th>ROUND</th><th>TIME</th><th>STATUS</th>
+                </tr></thead>
+                <tbody>
+                  {openPos.map(p=>{
+                    const m=mkts.find(x=>x.id===p.assetId);
+                    const live=m?m.lp:p.sp;
+                    const unreal=p.side==="LONG"?(live-p.sp)*p.stake/p.sp:-(live-p.sp)*p.stake/p.sp;
+                    return(
+                      <tr key={p.id}>
+                        <td style={{color:"var(--white)",fontFamily:"var(--sans)",fontWeight:600}}>{p.sym}</td>
+                        <td className={p.side==="LONG"?"pos-side-long":"pos-side-short"}>{p.side}</td>
+                        <td>{p.stake} ETH</td>
+                        <td>{fp(p.sp)}</td>
+                        <td style={{color:live>=p.sp?"var(--green)":"var(--red)"}}>{m?fp(live):"—"}</td>
+                        <td style={{color:unreal>=0?"var(--green)":"var(--red)"}}>{unreal>=0?"+":""}{unreal.toFixed(4)}</td>
+                        <td>#{p.rid}</td>
+                        <td>{p.ts}</td>
+                        <td><span className="pos-status pos-open">OPEN</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )
+          )}
+          {botTab==="HISTORY"&&(
+            positions.length===0?(
+              <div className="empty-state">NO ORDER HISTORY</div>
+            ):(
+              <table className="pos-table">
+                <thead><tr>
+                  <th>ASSET</th><th>SIDE</th><th>STAKE</th><th>ENTRY</th><th>ROUND</th><th>TIME</th><th>STATUS</th><th>P&L</th><th>ACTION</th>
+                </tr></thead>
+                <tbody>
+                  {positions.map(p=>(
+                    <tr key={p.id}>
+                      <td style={{color:"var(--white)",fontFamily:"var(--sans)",fontWeight:600}}>{p.sym}</td>
+                      <td className={p.side==="LONG"?"pos-side-long":"pos-side-short"}>{p.side}</td>
+                      <td>{p.stake} ETH</td>
+                      <td>{fp(p.sp)}</td>
+                      <td>#{p.rid}</td>
+                      <td>{p.ts}</td>
+                      <td><span className={`pos-status ${p.status==="OPEN"?"pos-open":p.status==="WIN"?"pos-win":"pos-loss"}`}>{p.status}</span></td>
+                      <td style={{color:p.pnl==null?"var(--gray)":p.pnl>=0?"var(--green)":"var(--red)"}}>
+                        {p.pnl!=null?(p.pnl>=0?"+":"")+p.pnl+" ETH":"—"}
+                      </td>
+                      <td>{p.status==="WIN"&&<button className="claim-btn" onClick={()=>claimPos(p)}>CLAIM</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+          {botTab==="WINS"&&(
+            wins.length===0?(
+              <div className="empty-state">NO SETTLED WINS YET</div>
+            ):(
+              <table className="pos-table">
+                <thead><tr>
+                  <th>ASSET</th><th>SIDE</th><th>STAKE</th><th>PAYOUT</th><th>RETURN</th><th>ROUND</th><th>TIME</th>
+                </tr></thead>
+                <tbody>
+                  {wins.map(p=>(
+                    <tr key={p.id}>
+                      <td style={{color:"var(--white)",fontFamily:"var(--sans)",fontWeight:600}}>{p.sym}</td>
+                      <td className="pos-side-long">{p.side}</td>
+                      <td>{p.stake} ETH</td>
+                      <td style={{color:"var(--green)"}}>{(p.stake+(p.pnl||0)).toFixed(4)} ETH</td>
+                      <td style={{color:"var(--green)"}}>+{p.pnl?.toFixed(4)} ETH</td>
+                      <td>#{p.rid}</td>
+                      <td>{p.ts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* ── STATUS BAR ── */}
+      <div className="statusbar">
+        <span>COMMOD/TERM INSTITUTIONAL PREDICTION MARKETS — SIMULATION + WEB3 READY</span>
+        <span style={{display:"flex",gap:12,alignItems:"center"}}>
+          <span className="sb-ok">● {mkts.filter(m=>m.phase==="OPEN").length}/{mkts.length} MARKETS LIVE</span>
+          <span style={{color:"var(--border)"}}>|</span>
+          <span className={wallet?"sb-ok":"sb-warn"}>{wallet?`⟠ ${chainName} ${wallet.bal} ETH`:"○ WALLET OFFLINE"}</span>
+          <span style={{color:"var(--border)"}}>|</span>
+          <span style={{fontFamily:"var(--mono)"}}>{now}</span>
         </span>
       </div>
 
-      {/* Modal */}
+      {/* ── MODAL ── */}
       {modal&&(
         <div className="modal-bg" onClick={()=>setModal(null)}>
-          <div className="modal" onClick={e=>e.stopPropagation()}>
-            <div className="modal-title">⚠ {modal.title}</div>
+          <div className="modal-box" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">{modal.title}</div>
             <div className="modal-body" dangerouslySetInnerHTML={{__html:modal.body}}/>
             <button className="modal-close" onClick={()=>setModal(null)}>DISMISS</button>
           </div>
@@ -784,7 +1039,7 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+ReactDOM.createRoot(document.getElementById("app")).render(<App/>);
 </script>
 </body>
 </html>
